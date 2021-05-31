@@ -1,2 +1,2 @@
 rootProject.name = "DpsDiff"
-include ':app'
+include ':app',':dps-diff'
