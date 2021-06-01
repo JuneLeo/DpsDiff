@@ -16,7 +16,6 @@ dependencies {
     implementation gradleApi()
     implementation localGroovy()
     implementation 'com.android.tools.build:gradle:3.2.1'
-    implementation group: 'net.sourceforge.javacsv', name: 'javacsv', version: '2.0'
 }
 
 

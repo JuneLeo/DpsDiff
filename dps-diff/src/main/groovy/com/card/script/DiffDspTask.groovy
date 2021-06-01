@@ -17,7 +17,10 @@ public class DiffDspTask extends DefaultTask {
 
     public String BUILD_DIR = 'diff';
     //html,console
+    @Input
     public String outType = "html";
+
+
 
     @TaskAction
     public void action() {
