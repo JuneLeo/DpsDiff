@@ -22,13 +22,16 @@ public class DependenciesGetTask extends DefaultTask {
     public String outType = 'cvs'
 
     @Input
-    public String[] exclude;
+    public String[] exclude
 
     @Input
     public String collectType = 'compile'   // compile,runtime,all
 
+    @Input
+    String outputDir = ''
+
     @TaskAction
-    public void action() {
+    void action() {
         def androidPlugin = [AppPlugin, LibraryPlugin]
                 .collect { project.plugins.findPlugin(it) }
                 .find()
@@ -130,9 +133,12 @@ public class DependenciesGetTask extends DefaultTask {
 
 
         }
+
+        String output = getOutputFilePath()
+
+
         if (outType == 'cvs') {
-            String path_code = getProject().rootProject.rootDir.getAbsolutePath() + "/dependencies.csv";
-            DependenciesCvsPrinter printer = new DependenciesCvsPrinter(path_code)
+            DependenciesCvsPrinter printer = new DependenciesCvsPrinter(output)
 
             Iterator<ResolvedComponentResult> iterator = dependencyResults.iterator()
             if (exclude != null && exclude.length > 0)
@@ -147,8 +153,19 @@ public class DependenciesGetTask extends DefaultTask {
                 }
             printer.print(resolvedArtifactResults, dependencyResults)
         }
+    }
 
 
+    String getOutputFilePath() {
+
+        String userHomePath = System.getProperty('user.home')
+
+
+        if (outputDir != null && outputDir != '' && outputDir.contains(userHomePath)) {
+            return outputDir
+        } else {
+            return project.buildDir.getAbsolutePath() + '/dependencies'
+        }
     }
 
 

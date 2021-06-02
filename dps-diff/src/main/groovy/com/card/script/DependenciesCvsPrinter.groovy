@@ -7,15 +7,28 @@ import org.gradle.api.artifacts.result.ResolvedComponentResult
 
 public class DependenciesCvsPrinter {
 
-    public String path;
+    public String dir;
 
     DependenciesCvsPrinter(String path) {
-        this.path = path
+        this.dir = path
+    }
+
+    String getOutputFile() {
+        File file = new File(dir + File.separator + 'dependencies.csv')
+        int index = 1;
+        while (file.exists()) {
+            file = new File(dir + File.separator + String.format('dependencies(%d).csv', index))
+            index++
+        }
+        if(!file.getParentFile().exists()){
+            file.getParentFile().mkdirs()
+        }
+        return file.getAbsolutePath()
     }
 
     void print(Set<ResolvedArtifactResult> resolvedArtifactResults, Set<ResolvedComponentResult> dependencyResults) {
-
-        Writer fileWriter = new FileWriter(path)
+        String outputFilePath = getOutputFile()
+        Writer fileWriter = new FileWriter(outputFilePath)
 
         fileWriter.write("module");
         fileWriter.write(",");
@@ -26,7 +39,6 @@ public class DependenciesCvsPrinter {
         fileWriter.write("version")
         fileWriter.write(",")
         fileWriter.write("path")
-
 
 
         // 如果觉得依赖项过多，可以过滤
@@ -48,8 +60,8 @@ public class DependenciesCvsPrinter {
             String group = dependencyResult.getModuleVersion().getModule().getGroup()
             String artifact = dependencyResult.getModuleVersion().getModule().getName()
 
-            ResolvedArtifactResult resolvedArtifactResult =  getArtifactResult(resolvedArtifactResults,moduleAndVersion)
-            if(resolvedArtifactResult == null){
+            ResolvedArtifactResult resolvedArtifactResult = getArtifactResult(resolvedArtifactResults, moduleAndVersion)
+            if (resolvedArtifactResult == null) {
                 throw new RuntimeException("not find ResolvedArtifactResult")
             }
             fileWriter.write("\n")
