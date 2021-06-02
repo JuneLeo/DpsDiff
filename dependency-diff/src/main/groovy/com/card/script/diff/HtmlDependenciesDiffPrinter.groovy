@@ -65,7 +65,7 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
             }
 
             if (diffModel.dependenciesDiffFileModels != null) {
-                htmlChild(htmlFile, diffModel.dependenciesDiffFileModels)
+                htmlChild(htmlFile, diffModel)
             }
             fileWriter.write("<tr> \n")
 
@@ -104,13 +104,15 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
     String getModuleDiffFileGroup(DependenciesDiffTask.DependenciesDiffModel diffModel) {
         StringBuilder stringBuilder = new StringBuilder()
         for (DependenciesDiffTask.DependenciesDiffFileGroupModel groupModel : diffModel.diffFileModelMap.values()) {
-            stringBuilder.append("<br />")
-            stringBuilder.append(Utils.getSpace('&nbsp;',10,groupModel.getType()) + " : " + groupModel.diff)
+            if(groupModel.diff != 0){
+                stringBuilder.append("<br />")
+                stringBuilder.append(Utils.getSpace('&nbsp;', 10, groupModel.getType()) + " : " + groupModel.diff)
+            }
         }
         return stringBuilder.toString()
     }
 
-    def htmlChild(File htmlFile, List<DependenciesDiffTask.DependenciesDiffFileModel> diffFileModels) {
+    def htmlChild(File htmlFile, DependenciesDiffTask.DependenciesDiffModel dependenciesDiffModel) {
 
         FileWriter fileWriter = new FileWriter(htmlFile)
         fileWriter.write("<!DOCTYPE html>\n" +
@@ -123,48 +125,69 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
                 "<title>" + htmlFile.getName() + "</title>\n" +
                 "</head>")
         fileWriter.write("<body>")
-        fileWriter.write("<table class=\"table table-striped\">")
 
-        fileWriter.write("<tr>")
 
-        fileWriter.write("<td>")
-        fileWriter.write("状态")
-        fileWriter.write("</td>")
-
-        fileWriter.write("<td>")
-        fileWriter.write("文件")
-        fileWriter.write("</td>")
-
-        fileWriter.write("<td>")
-        fileWriter.write("差异")
-        fileWriter.write("</td>")
-
-        fileWriter.write("</tr>")
-
-        for (DependenciesDiffTask.DependenciesDiffFileModel diffFileModel : diffFileModels) {
-
-            if (diffFileModel.diffFileSize != 0) {
-                //println("    " + diffFileModel.getChange() + " : " + diffFileModel.shortPath + ", " + diffFileModel.diff)
-
-                fileWriter.write("<tr>")
-
-                fileWriter.write("<td>")
-                fileWriter.write(diffFileModel.getChange())
-                fileWriter.write("</td>")
-
-                fileWriter.write("<td>")
-                fileWriter.write(diffFileModel.fileShortPath)
-                fileWriter.write("</td>")
-
-                fileWriter.write("<td>")
-                fileWriter.write(diffFileModel.diffFileSize + "")
-                fileWriter.write("</td>")
-
-                fileWriter.write("</tr>")
+        for (DependenciesDiffTask.DependenciesDiffFileGroupModel groupModel : dependenciesDiffModel.diffFileModelMap.values()) {
+            Collection<DependenciesDiffTask.DependenciesDiffFileModel> diffFileModels = groupModel.getList()
+            List<DependenciesDiffTask.DependenciesDiffFileModel> tempList = new ArrayList<>()
+            for (DependenciesDiffTask.DependenciesDiffFileModel diffFileModel : diffFileModels) {
+                if (diffFileModel.diffFileSize != 0) {
+                    tempList.add(diffFileModel)
+                }
             }
+
+            if(tempList == null || tempList.isEmpty()){
+                continue
+            }
+            fileWriter.write("<div style=\"background-color: #0ba194;width: 100%;height: 50px;vertical-align: middle\"> <p style=\"font-size: 30px;display: table-cell;height: 50px;vertical-align: middle\" >")
+            fileWriter.write(groupModel.getType() + "&nbsp;")
+            fileWriter.write("</p></div>")
+            fileWriter.write("<table class=\"table table-striped\">")
+
+            fileWriter.write("<tr>")
+
+            fileWriter.write("<td>")
+            fileWriter.write("状态")
+            fileWriter.write("</td>")
+
+            fileWriter.write("<td>")
+            fileWriter.write("文件")
+            fileWriter.write("</td>")
+
+            fileWriter.write("<td>")
+            fileWriter.write("差异")
+            fileWriter.write("</td>")
+
+            fileWriter.write("</tr>")
+
+            for (DependenciesDiffTask.DependenciesDiffFileModel diffFileModel : tempList) {
+
+                if (diffFileModel.diffFileSize != 0) {
+                    //println("    " + diffFileModel.getChange() + " : " + diffFileModel.shortPath + ", " + diffFileModel.diff)
+
+                    fileWriter.write("<tr>")
+
+                    fileWriter.write("<td>")
+                    fileWriter.write(diffFileModel.getChange())
+                    fileWriter.write("</td>")
+
+                    fileWriter.write("<td>")
+                    fileWriter.write(diffFileModel.fileShortPath)
+                    fileWriter.write("</td>")
+
+                    fileWriter.write("<td>")
+                    fileWriter.write(diffFileModel.diffFileSize + "")
+                    fileWriter.write("</td>")
+
+                    fileWriter.write("</tr>")
+                }
+            }
+
+            fileWriter.write("</table>")
+
         }
 
-        fileWriter.write("</table>")
+
 
         fileWriter.write("</body>")
         fileWriter.write("</html>")

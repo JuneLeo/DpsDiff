@@ -194,8 +194,6 @@ public class DependenciesDiffTask extends DefaultTask {
         }
 
 
-
-
         @Override
         int compareTo(@NotNull DependenciesDiffModel o) {
             return Long.compare(o.diff, diff)
@@ -215,8 +213,9 @@ public class DependenciesDiffTask extends DefaultTask {
 
         public static final int TYPE_CLASS = 1;
         public static final int TYPE_SO = 2;
-        public static final int TYPE_XML = 3;
-        public static final int TYPE_UNKNOW = 4;
+        public static final int TYPE_RES = 3;
+        public static final int TYPE_ASSETS = 4;
+        public static final int TYPE_UNKNOW = 5;
 
         public int fileType = TYPE_UNKNOW;
 
@@ -233,14 +232,17 @@ public class DependenciesDiffTask extends DefaultTask {
             diffFileSize = firstFileSize - secondFileSize
         }
 
-        static def handleFileType(String fileName, DependenciesDiffFileModel diffFileModel) {
-
+        static def handleFileType(File file, DependenciesDiffFileModel diffFileModel) {
+            String fileName = file.getName()
+            String filePath = file.getAbsolutePath()
             if (fileName.contains(".class")) {
                 diffFileModel.fileType = TYPE_CLASS
-            } else if (fileName.contains(".xml")) {
-                diffFileModel.fileType = TYPE_XML
             } else if (fileName.contains(".so")) {
                 diffFileModel.fileType = TYPE_SO
+            } else if (filePath.contains("/res/")) {
+                diffFileModel.fileType = TYPE_RES
+            } else if (filePath.contains("/assets/")) {
+                diffFileModel.fileType = TYPE_ASSETS
             } else {
                 diffFileModel.fileType = TYPE_UNKNOW
             }
@@ -248,13 +250,15 @@ public class DependenciesDiffTask extends DefaultTask {
 
         static String getType(int type) {
             if (type == TYPE_CLASS) {
-                return 'class文件'
+                return 'class'
             } else if (type == TYPE_SO) {
-                return 'so文件'
-            } else if (type == TYPE_XML) {
-                return 'xml文件'
+                return 'so'
+            } else if (type == TYPE_RES) {
+                return 'res'
+            } else if (type == TYPE_ASSETS) {
+                return 'assets'
             } else {
-                return '未识别'
+                return 'unknow'
             }
         }
 
@@ -316,7 +320,7 @@ public class DependenciesDiffTask extends DefaultTask {
             }
             diffFileDependenciesModel.filePath = firstChildPath
             diffFileDependenciesModel.fileShortPath = firstChildPath.substring(firstDependencyPathEndIndex)
-            diffFileDependenciesModel.handleFileType(firstChildFile.getName(), diffFileDependenciesModel)
+            diffFileDependenciesModel.handleFileType(firstChildFile, diffFileDependenciesModel)
             diffFileDependenciesModel.handle()
             diffDependenciesModelList.add(diffFileDependenciesModel)
         }
@@ -334,7 +338,7 @@ public class DependenciesDiffTask extends DefaultTask {
                 diffFileModel.filePath = secondChildPath
                 diffFileModel.fileShortPath = secondChildPath.substring(secondDependencyPathEndIndex)
                 diffFileModel.fileChange = DependenciesDiffFileModel.CHANGE_DEL
-                DependenciesDiffFileModel.handleFileType(secondChildFile.getName(), diffFileModel)
+                DependenciesDiffFileModel.handleFileType(secondChildFile, diffFileModel)
                 diffFileModel.handle()
                 diffDependenciesModelList.add(diffFileModel)
             }
