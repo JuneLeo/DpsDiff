@@ -1,24 +1,22 @@
 package com.card.script
 
-import com.android.build.gradle.AppExtension;
+import com.android.build.gradle.AppExtension
 import com.android.build.gradle.AppPlugin
-import com.android.build.gradle.LibraryExtension;
+import com.android.build.gradle.LibraryExtension
 import com.android.build.gradle.LibraryPlugin
 import com.android.build.gradle.api.ApplicationVariant
 import com.android.build.gradle.api.LibraryVariant
-import org.gradle.api.Action;
+import org.gradle.api.Action
 import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.ArtifactCollection
 import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.artifacts.result.ResolvedComponentResult
-import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.attributes.AttributeContainer
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.TaskAction
 
-public class DspTask extends DefaultTask {
+public class DependenciesGetTask extends DefaultTask {
 
 
     public String outType = 'cvs'
@@ -134,7 +132,7 @@ public class DspTask extends DefaultTask {
         }
         if (outType == 'cvs') {
             String path_code = getProject().rootProject.rootDir.getAbsolutePath() + "/dependencies.csv";
-            DspCvsPrinter printer = new DspCvsPrinter(path_code)
+            DependenciesCvsPrinter printer = new DependenciesCvsPrinter(path_code)
 
             Iterator<ResolvedComponentResult> iterator = dependencyResults.iterator()
             if (exclude != null && exclude.length > 0)

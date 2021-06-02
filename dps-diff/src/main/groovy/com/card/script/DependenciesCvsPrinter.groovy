@@ -1,19 +1,15 @@
 package com.card.script
 
-import org.gradle.api.artifacts.ModuleVersionIdentifier
+
 import org.gradle.api.artifacts.component.ComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.artifacts.result.ResolvedComponentResult
-import org.gradle.api.artifacts.result.ResolvedDependencyResult
-import org.gradle.api.internal.artifacts.DefaultModuleVersionIdentifier
 
-import java.util.function.Consumer
-
-public class DspCvsPrinter {
+public class DependenciesCvsPrinter {
 
     public String path;
 
-    DspCvsPrinter(String path) {
+    DependenciesCvsPrinter(String path) {
         this.path = path
     }
 
