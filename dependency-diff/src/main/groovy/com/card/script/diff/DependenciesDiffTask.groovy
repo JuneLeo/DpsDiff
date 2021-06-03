@@ -39,20 +39,34 @@ public class DependenciesDiffTask extends DefaultTask {
 
         List<DependenciesDiffModel> diffModels = new ArrayList<>();
         for (DependenciesModel firstDependencyModel : firstDependenciesModels) {
+            println("正在扫描 ：" + firstDependencyModel.group + ":" + firstDependencyModel.artifact)
             if (!project.file(firstDependencyModel.path).exists()) {
+                println("    [" + firstDependencyModel.module + "] not exists")
                 continue
             }
-
             DependenciesModel secondDependencyModel = getSameModel(secondDependenciesModels, firstDependencyModel)
+            //新添加的依赖
             if (secondDependencyModel == null) {
                 DependenciesDiffModel newCreateModel = new DependenciesDiffModel()
                 newCreateModel.firstDependenciesModel = firstDependencyModel
                 newCreateModel.status = DependenciesDiffModel.STATUS_NEW
                 newCreateModel.handle()
                 diffModels.add(newCreateModel)
+                println("    [" + firstDependencyModel.group + ":" + firstDependencyModel.artifact + "] is new")
                 continue
             }
-            println("正在扫描 ：" + firstDependencyModel.group + ":" + firstDependencyModel.artifact)
+            //依赖没有变化
+            if (secondDependencyModel.version == firstDependencyModel.version) {
+                DependenciesDiffModel sameModel = new DependenciesDiffModel()
+                sameModel.firstDependenciesModel = firstDependencyModel
+                sameModel.status = DependenciesDiffModel.STATUS_NEW
+                sameModel.handle()
+                diffModels.add(sameModel)
+                println("    [" + firstDependencyModel.module + "] not change")
+                continue
+            }
+            println("    [" + firstDependencyModel.group + ":" + firstDependencyModel.artifact + "] start compare ...")
+            //比较依赖
             DependenciesDiffModel diffModel = handleDiffModel(firstDependencyModel, secondDependencyModel)
             diffModels.add(diffModel)
         }
@@ -64,13 +78,15 @@ public class DependenciesDiffTask extends DefaultTask {
             }
 
             DependenciesModel firstDependencyModel = getSameModel(firstDependenciesModels, secondDependencyModel)
-
+            //删除的依赖
             if (firstDependencyModel == null) {
+                println("正在扫描 ：" + secondDependencyModel.group + ":" + secondDependencyModel.artifact)
                 DependenciesDiffModel deleteModel = new DependenciesDiffModel();
                 deleteModel.secondDependenciesModel = secondDependencyModel
                 deleteModel.status = DependenciesDiffModel.STATUS_DELETE
                 deleteModel.handle()
                 diffModels.add(deleteModel)
+                println("    [" + secondDependencyModel.module + "] 被删除")
             }
         }
         diffModels.sort()
@@ -106,9 +122,12 @@ public class DependenciesDiffTask extends DefaultTask {
     }
 
     static class DependenciesDiffModel implements Comparable<DependenciesDiffModel> {
-        public static final STATUS_NORMAL = 0
-        public static final STATUS_NEW = 1
-        public static final STATUS_DELETE = 2
+        public static final STATUS_NORMAL = 1
+        public static final STATUS_CHANGE = 2
+        public static final STATUS_NEW = 3
+        public static final STATUS_DELETE = 4
+        public static final STATUS_SAME_VERSION = 5
+        public static final STATUS_SAME_CONTENT = 6
         public int status = STATUS_NORMAL
         public List<DependenciesDiffFileModel> dependenciesDiffFileModels = new ArrayList<>()
         public DependenciesModel firstDependenciesModel
@@ -116,6 +135,22 @@ public class DependenciesDiffTask extends DefaultTask {
         public Map<Integer, DependenciesDiffFileGroupModel> diffFileModelMap = new HashMap<>();
 
         public long diff
+
+        static String getNameByStatus(int status) {
+            if (status == STATUS_CHANGE) {
+                return '改变'
+            } else if (status == STATUS_NEW) {
+                return '新增'
+            } else if (status == STATUS_DELETE) {
+                return '删除'
+            } else if (status == STATUS_SAME_VERSION) {
+                return '未改变'
+            } else if (status == STATUS_SAME_CONTENT) {
+                return '内容没有改变'
+            } else {
+                return '未知'
+            }
+        }
 
         def handle() {
             if (firstDependenciesModel != null && secondDependenciesModel != null) {
@@ -126,6 +161,23 @@ public class DependenciesDiffTask extends DefaultTask {
                 diff = -secondDependenciesModel.size
             }
             doHandleGroup()
+            doHandleStatus()
+        }
+
+
+        def doHandleStatus() {
+            if (status == STATUS_CHANGE) {
+                boolean isChange = false
+                for (def diffModel : dependenciesDiffFileModels) {
+                    if (diffModel.fileChange != DependenciesDiffFileModel.CHANGE_EQ) {
+                        isChange = true
+                        break
+                    }
+                }
+                if (!isChange) {
+                    status = STATUS_SAME_CONTENT
+                }
+            }
         }
 
         def doHandleGroup() {
@@ -349,6 +401,7 @@ public class DependenciesDiffTask extends DefaultTask {
         diffModel.firstDependenciesModel = firstDependencyModel
         diffModel.secondDependenciesModel = secondDependencyModel
         diffModel.dependenciesDiffFileModels = diffDependenciesModelList
+        diffModel.status = DependenciesDiffModel.STATUS_CHANGE
         diffModel.handle()
         return diffModel
     }
