@@ -59,7 +59,8 @@ public class DependenciesDiffTask extends DefaultTask {
             if (secondDependencyModel.version == firstDependencyModel.version) {
                 DependenciesDiffModel sameModel = new DependenciesDiffModel()
                 sameModel.firstDependenciesModel = firstDependencyModel
-                sameModel.status = DependenciesDiffModel.STATUS_NEW
+                sameModel.secondDependenciesModel = secondDependencyModel
+                sameModel.status = DependenciesDiffModel.STATUS_SAME_VERSION
                 sameModel.handle()
                 diffModels.add(sameModel)
                 println("    [" + firstDependencyModel.module + "] not change")
@@ -128,6 +129,8 @@ public class DependenciesDiffTask extends DefaultTask {
         public static final STATUS_DELETE = 4
         public static final STATUS_SAME_VERSION = 5
         public static final STATUS_SAME_CONTENT = 6
+
+
         public int status = STATUS_NORMAL
         public List<DependenciesDiffFileModel> dependenciesDiffFileModels = new ArrayList<>()
         public DependenciesModel firstDependenciesModel
@@ -144,7 +147,7 @@ public class DependenciesDiffTask extends DefaultTask {
             } else if (status == STATUS_DELETE) {
                 return '删除'
             } else if (status == STATUS_SAME_VERSION) {
-                return '未改变'
+                return '版本未改变'
             } else if (status == STATUS_SAME_CONTENT) {
                 return '内容没有改变'
             } else {

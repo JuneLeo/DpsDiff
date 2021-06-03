@@ -84,10 +84,10 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
 
             for (DependenciesDiffTask.DependenciesDiffModel diffModel : entry.value) {
 
-                if (diffModel.status == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_VERSION) {
-                    //没有变化的依赖
-                    continue
-                }
+//                if (diffModel.status == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_VERSION) {
+//                    //没有变化的依赖
+//                    continue
+//                }
 
 
                 String htmlPath = diffModel.module.replace(":", "_") + ".html"
