@@ -15,11 +15,11 @@ public class DependenciesCvsPrinter {
 
     String getOutputFile() {
         File file = new File(dir + File.separator + 'dependencies.csv')
-        int index = 1;
-        while (file.exists()) {
-            file = new File(dir + File.separator + String.format('dependencies(%d).csv', index))
-            index++
-        }
+//        int index = 1;
+//        while (file.exists()) {
+//            file = new File(dir + File.separator + String.format('dependencies(%d).csv', index))
+//            index++
+//        }
         if(!file.getParentFile().exists()){
             file.getParentFile().mkdirs()
         }
