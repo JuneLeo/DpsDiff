@@ -55,6 +55,11 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
 
         for (def entry : diffModelMap.entrySet()) {
 
+            if(entry.key == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_CONTENT
+                    || entry.key == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_VERSION){
+                continue
+            }
+
             fileWriter.write("<div style=\"background-color: #0ba194;width: 100%;height: 50px;vertical-align: middle\"> <p style=\"font-size: 30px;display: table-cell;height: 50px;vertical-align: middle\" >")
             fileWriter.write(DependenciesDiffTask.DependenciesDiffModel.getNameByStatus(entry.key) + "&nbsp;")
             fileWriter.write("</p></div>")
