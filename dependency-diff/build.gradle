@@ -1,21 +1,26 @@
 apply plugin: 'groovy'
 apply plugin: 'java'
 
+
 apply plugin: 'com.github.dcendents.android-maven'
+
 group = 'com.task.script'
 
-sourceCompatibility = JavaVersion.VERSION_1_7
-targetCompatibility = JavaVersion.VERSION_1_7
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     google()
     jcenter()
+    maven {
+        url "https://plugins.gradle.org/m2/"
+    }
 }
 
 dependencies {
     implementation gradleApi()
     implementation localGroovy()
-    implementation 'com.android.tools.build:gradle:3.2.1'
+    compileOnly 'com.android.tools.build:gradle:4.2.1'
 }
 
 

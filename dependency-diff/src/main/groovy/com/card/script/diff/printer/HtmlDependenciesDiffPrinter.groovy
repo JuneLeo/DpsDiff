@@ -1,21 +1,25 @@
-package com.card.script.diff
+package com.card.script.diff.printer
 
 import com.card.script.Utils
+import com.card.script.diff.DependenciesDiffTask
+import com.card.script.diff.model.DependenciesDiffFileGroupModel
+import com.card.script.diff.model.DependenciesDiffFileModel
+import com.card.script.diff.model.DependenciesDiffModel
 import org.gradle.api.Project
 
 class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
     Project mProject
+    String buildDir
 
-    HtmlDependenciesDiffPrinter(Project project) {
+    HtmlDependenciesDiffPrinter(Project project, String dir) {
         this.mProject = project
+        this.buildDir = dir
     }
 
     @Override
-    void printer(List<DependenciesDiffTask.DependenciesDiffModel> diffModels) {
+    void printer(List<DependenciesDiffModel> diffModels) {
 
-        File buildDir = mProject.file(mProject.buildDir.getAbsolutePath() + File.separator + DependenciesDiffTask.BUILD_DIR)
-
-        File reportDir = mProject.file(buildDir.getAbsolutePath() + File.separator + 'report')
+        File reportDir = mProject.file(buildDir + File.separator + 'report')
         if (reportDir.exists()) {
             reportDir.deleteDir()
         }
@@ -34,9 +38,9 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
                 "</head>")
         fileWriter.write("<body>")
 
-        Map<Integer, List<DependenciesDiffTask.DependenciesDiffModel>> diffModelMap = new HashMap<>()
+        Map<Integer, List<DependenciesDiffModel>> diffModelMap = new HashMap<>()
 
-        for (DependenciesDiffTask.DependenciesDiffModel diffModel : diffModels) {
+        for (DependenciesDiffModel diffModel : diffModels) {
             def diffModelList = diffModelMap.get(diffModel.status)
             if (diffModelList == null) {
                 diffModelList = new ArrayList<>()
@@ -45,9 +49,9 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
             diffModelList.add(diffModel)
         }
 
-        diffModelMap.toSorted(new Comparator<Map.Entry<Integer, List<DependenciesDiffTask.DependenciesDiffModel>>>() {
+        diffModelMap.toSorted(new Comparator<Map.Entry<Integer, List<DependenciesDiffModel>>>() {
             @Override
-            int compare(Map.Entry<Integer, List<DependenciesDiffTask.DependenciesDiffModel>> o1, Map.Entry<Integer, List<DependenciesDiffTask.DependenciesDiffModel>> o2) {
+            int compare(Map.Entry<Integer, List<DependenciesDiffModel>> o1, Map.Entry<Integer, List<DependenciesDiffModel>> o2) {
                 return o1.key - o2.key
             }
         })
@@ -55,13 +59,8 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
 
         for (def entry : diffModelMap.entrySet()) {
 
-            if(entry.key == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_CONTENT
-                    || entry.key == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_VERSION){
-                continue
-            }
-
             fileWriter.write("<div style=\"background-color: #0ba194;width: 100%;height: 50px;vertical-align: middle\"> <p style=\"font-size: 30px;display: table-cell;height: 50px;vertical-align: middle\" >")
-            fileWriter.write(DependenciesDiffTask.DependenciesDiffModel.getNameByStatus(entry.key) + "&nbsp;")
+            fileWriter.write(DependenciesDiffModel.getNameByStatus(entry.key) + "&nbsp;")
             fileWriter.write("</p></div>")
 
             fileWriter.write("<table class=\"table table-striped\">")
@@ -87,9 +86,9 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
 
             fileWriter.write("</tr>")
 
-            for (DependenciesDiffTask.DependenciesDiffModel diffModel : entry.value) {
+            for (DependenciesDiffModel diffModel : entry.value) {
 
-//                if (diffModel.status == DependenciesDiffTask.DependenciesDiffModel.STATUS_SAME_VERSION) {
+//                if (diffModel.status == DependenciesDiffModel.STATUS_SAME_VERSION) {
 //                    //没有变化的依赖
 //                    continue
 //                }
@@ -100,9 +99,9 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
                 if (htmlFile.exists()) {
                     htmlFile.delete()
                 }
-
+                Map<Integer, DependenciesDiffFileGroupModel> diffFileGroupModelMap
                 if (diffModel.dependenciesDiffFileModels != null) {
-                    htmlChild(htmlFile, diffModel)
+                    diffFileGroupModelMap = htmlChild(htmlFile, diffModel)
                 }
                 fileWriter.write("<tr> \n")
 
@@ -110,7 +109,7 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
                 fileWriter.write(String.format("<a href=\"%s\">\n", "./" + htmlPath))
                 fileWriter.write(diffModel.getModule())
                 fileWriter.write("</a>\n")
-                fileWriter.write(getModuleDiffFileGroup(diffModel))
+                fileWriter.write(getModuleDiffFileGroup(diffFileGroupModelMap))
                 fileWriter.write("</td>\n")
 
                 fileWriter.write("<td>\n")
@@ -138,9 +137,12 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
     }
 
 
-    String getModuleDiffFileGroup(DependenciesDiffTask.DependenciesDiffModel diffModel) {
+    static String getModuleDiffFileGroup(Map<Integer, DependenciesDiffFileGroupModel> diffFileGroupModelMap) {
+        if (diffFileGroupModelMap == null) {
+            return ""
+        }
         StringBuilder stringBuilder = new StringBuilder()
-        for (DependenciesDiffTask.DependenciesDiffFileGroupModel groupModel : diffModel.diffFileModelMap.values()) {
+        for (DependenciesDiffFileGroupModel groupModel : diffFileGroupModelMap.values()) {
             if (groupModel.diff != 0) {
                 stringBuilder.append("<br />")
                 stringBuilder.append(Utils.getSpace('&nbsp;', 10, groupModel.getType()) + " : " + groupModel.diff)
@@ -149,7 +151,7 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
         return stringBuilder.toString()
     }
 
-    def htmlChild(File htmlFile, DependenciesDiffTask.DependenciesDiffModel dependenciesDiffModel) {
+    static Map<Integer, DependenciesDiffFileGroupModel> htmlChild(File htmlFile, DependenciesDiffModel dependenciesDiffModel) {
 
         FileWriter fileWriter = new FileWriter(htmlFile)
         fileWriter.write("<!DOCTYPE html>\n" +
@@ -163,11 +165,11 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
                 "</head>")
         fileWriter.write("<body>")
 
-
-        for (DependenciesDiffTask.DependenciesDiffFileGroupModel groupModel : dependenciesDiffModel.diffFileModelMap.values()) {
-            Collection<DependenciesDiffTask.DependenciesDiffFileModel> diffFileModels = groupModel.getList()
-            List<DependenciesDiffTask.DependenciesDiffFileModel> tempList = new ArrayList<>()
-            for (DependenciesDiffTask.DependenciesDiffFileModel diffFileModel : diffFileModels) {
+        Map<Integer, DependenciesDiffFileGroupModel> diffFileModelMap = DependenciesDiffModel.doHandleGroup(dependenciesDiffModel.dependenciesDiffFileModels)
+        for (DependenciesDiffFileGroupModel groupModel : diffFileModelMap.values()) {
+            Collection<DependenciesDiffFileModel> diffFileModels = groupModel.getList()
+            List<DependenciesDiffFileModel> tempList = new ArrayList<>()
+            for (DependenciesDiffFileModel diffFileModel : diffFileModels) {
                 if (diffFileModel.diffFileSize != 0) {
                     tempList.add(diffFileModel)
                 }
@@ -197,7 +199,7 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
 
             fileWriter.write("</tr>")
 
-            for (DependenciesDiffTask.DependenciesDiffFileModel diffFileModel : tempList) {
+            for (DependenciesDiffFileModel diffFileModel : tempList) {
 
                 if (diffFileModel.diffFileSize != 0) {
                     //println("    " + diffFileModel.getChange() + " : " + diffFileModel.shortPath + ", " + diffFileModel.diff)
@@ -228,6 +230,8 @@ class HtmlDependenciesDiffPrinter implements IDependenciesDiffPrinter {
         fileWriter.write("</body>")
         fileWriter.write("</html>")
         fileWriter.close()
+
+        return diffFileModelMap
     }
 
 }

@@ -1,2 +1,3 @@
-rootProject.name = "DpsDiff"
 include ':app',':dependency-diff'
+
+
