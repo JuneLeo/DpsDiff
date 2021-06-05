@@ -1,12 +1,16 @@
 package com.card.script.diff
 
-import com.card.script.Utils
+import com.card.script.diff.model.DependenciesDiffFileModel
+import com.card.script.diff.model.DependenciesDiffModel
+import com.card.script.diff.model.DependenciesModel
+import com.card.script.diff.printer.ConsoleDependenciesDiffPrinter
+import com.card.script.diff.printer.HtmlDependenciesDiffPrinter
+import com.card.script.diff.printer.IDependenciesDiffPrinter
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.TaskAction
-import org.jetbrains.annotations.NotNull
 
-public class DependenciesDiffTask extends DefaultTask {
+class DependenciesDiffTask extends DefaultTask {
 
     @Input
     public String firstPath;
@@ -19,6 +23,11 @@ public class DependenciesDiffTask extends DefaultTask {
     @Input
     public String outType = "html";
 
+    public String[] excludeModule
+    public String[] excludeModuleFile
+
+    public int[] excludeModuleStatus = [5, 6]
+
 
     @TaskAction
     def action() {
@@ -26,7 +35,7 @@ public class DependenciesDiffTask extends DefaultTask {
         File secondFilePath = project.file(secondPath)
 
         if (!firstFilePath.exists() || !secondFilePath.exists()) {
-            throw new RuntimeException("newVersionPath or oldVersionPath not exists")
+            throw new RuntimeException("firstPath or secondPath not exists")
         }
 
         File buildDir = project.file(project.buildDir.getAbsolutePath() + File.separator + BUILD_DIR)
@@ -36,6 +45,7 @@ public class DependenciesDiffTask extends DefaultTask {
 
         List<DependenciesModel> firstDependenciesModels = getDependenciesModels(firstFilePath.getAbsolutePath())
         List<DependenciesModel> secondDependenciesModels = getDependenciesModels(secondFilePath.getAbsolutePath())
+
 
         List<DependenciesDiffModel> diffModels = new ArrayList<>();
         for (DependenciesModel firstDependencyModel : firstDependenciesModels) {
@@ -47,15 +57,12 @@ public class DependenciesDiffTask extends DefaultTask {
             DependenciesModel secondDependencyModel = getSameModel(secondDependenciesModels, firstDependencyModel)
             //新添加的依赖
             if (secondDependencyModel == null) {
-                DependenciesDiffModel newCreateModel = new DependenciesDiffModel()
-                newCreateModel.firstDependenciesModel = firstDependencyModel
-                newCreateModel.status = DependenciesDiffModel.STATUS_NEW
-                newCreateModel.handle()
+                DependenciesDiffModel newCreateModel = handleNewCreateModel(firstDependencyModel)
                 diffModels.add(newCreateModel)
                 println("    [" + firstDependencyModel.group + ":" + firstDependencyModel.artifact + "] is new")
                 continue
             }
-            //依赖没有变化
+            //依赖版本相同
             if (secondDependencyModel.version == firstDependencyModel.version) {
                 DependenciesDiffModel sameModel = new DependenciesDiffModel()
                 sameModel.firstDependenciesModel = firstDependencyModel
@@ -93,249 +100,19 @@ public class DependenciesDiffTask extends DefaultTask {
         diffModels.sort()
 
 
+        handleExclude(diffModels)
+
+
         if (outType == 'console') {
             IDependenciesDiffPrinter printer = new ConsoleDependenciesDiffPrinter(project)
             printer.printer(diffModels)
         } else {
-            IDependenciesDiffPrinter printer = new HtmlDependenciesDiffPrinter(project)
+            IDependenciesDiffPrinter printer = new HtmlDependenciesDiffPrinter(project, buildDir.getAbsolutePath())
             printer.printer(diffModels)
         }
     }
 
-    static class DependenciesDiffFileGroupModel {
-        List<DependenciesDiffFileModel> diffFileModelList = new ArrayList<>()
-        long diff = 0
-        int type
-
-        def add(DependenciesDiffFileModel dependenciesDiffFileModel) {
-            diff += dependenciesDiffFileModel.diffFileSize
-            diffFileModelList.add(dependenciesDiffFileModel)
-        }
-
-        List<DependenciesDiffFileModel> getList() {
-            return diffFileModelList
-        }
-
-        String getType() {
-            return DependenciesDiffFileModel.getType(type)
-        }
-
-    }
-
-    static class DependenciesDiffModel implements Comparable<DependenciesDiffModel> {
-        public static final STATUS_NORMAL = 1
-        public static final STATUS_CHANGE = 2
-        public static final STATUS_NEW = 3
-        public static final STATUS_DELETE = 4
-        public static final STATUS_SAME_VERSION = 5
-        public static final STATUS_SAME_CONTENT = 6
-
-
-        public int status = STATUS_NORMAL
-        public List<DependenciesDiffFileModel> dependenciesDiffFileModels = new ArrayList<>()
-        public DependenciesModel firstDependenciesModel
-        public DependenciesModel secondDependenciesModel
-        public Map<Integer, DependenciesDiffFileGroupModel> diffFileModelMap = new HashMap<>();
-
-        public long diff
-
-        static String getNameByStatus(int status) {
-            if (status == STATUS_CHANGE) {
-                return '改变'
-            } else if (status == STATUS_NEW) {
-                return '新增'
-            } else if (status == STATUS_DELETE) {
-                return '删除'
-            } else if (status == STATUS_SAME_VERSION) {
-                return '版本未改变'
-            } else if (status == STATUS_SAME_CONTENT) {
-                return '内容没有改变'
-            } else {
-                return '未知'
-            }
-        }
-
-        def handle() {
-            if (firstDependenciesModel != null && secondDependenciesModel != null) {
-                diff = firstDependenciesModel.size - secondDependenciesModel.size
-            } else if (firstDependenciesModel != null) {
-                diff = firstDependenciesModel.size
-            } else if (secondDependenciesModel != null) {
-                diff = -secondDependenciesModel.size
-            }
-            doHandleGroup()
-            doHandleStatus()
-        }
-
-
-        def doHandleStatus() {
-            if (status == STATUS_CHANGE) {
-                boolean isChange = false
-                for (def diffModel : dependenciesDiffFileModels) {
-                    if (diffModel.fileChange != DependenciesDiffFileModel.CHANGE_EQ) {
-                        isChange = true
-                        break
-                    }
-                }
-                if (!isChange) {
-                    status = STATUS_SAME_CONTENT
-                }
-            }
-        }
-
-        def doHandleGroup() {
-            for (DependenciesDiffFileModel dependenciesDiffFileModel : dependenciesDiffFileModels) {
-                int fileType = dependenciesDiffFileModel.fileType
-                DependenciesDiffFileGroupModel groupModel = diffFileModelMap.get(fileType)
-                if (groupModel == null) {
-                    groupModel = new DependenciesDiffFileGroupModel()
-                    groupModel.type = fileType
-                    diffFileModelMap.put(fileType, groupModel)
-                }
-                groupModel.add(dependenciesDiffFileModel)
-            }
-        }
-
-        long getModelSize() {
-            if (firstDependenciesModel != null) {
-                return firstDependenciesModel.size
-            }
-            return 0
-        }
-
-        long getOldModelSize() {
-            if (firstDependenciesModel != null) {
-                return firstDependenciesModel.size
-            }
-            return 0
-        }
-
-        String getModule() {
-            if (firstDependenciesModel != null) {
-                return firstDependenciesModel.group + ":" + firstDependenciesModel.artifact
-            } else if (secondDependenciesModel != null) {
-                return secondDependenciesModel.group + ":" + secondDependenciesModel.artifact
-            } else {
-                return "unknow"
-            }
-        }
-
-        String getModelInfo() {
-            if (firstDependenciesModel != null) {
-                return Utils.getSpace(30, "version : " + firstDependenciesModel.version) + ", size " + firstDependenciesModel.size
-            }
-            return "";
-        }
-
-        String getModelInfoByHtml() {
-            if (firstDependenciesModel != null) {
-                return "version : " + firstDependenciesModel.version + "<br />size : " + firstDependenciesModel.size
-            }
-            return "";
-        }
-
-        String getOldModelInfo() {
-            if (secondDependenciesModel != null) {
-                return Utils.getSpace(30, "version : " + secondDependenciesModel.version) + ", size " + secondDependenciesModel.size
-            }
-            return "";
-        }
-
-        String getOldModelInfoByHtml() {
-            if (secondDependenciesModel != null) {
-                return "version : " + secondDependenciesModel.version + "<br />size : " + secondDependenciesModel.size
-            }
-            return "";
-        }
-
-
-        @Override
-        int compareTo(@NotNull DependenciesDiffModel o) {
-            return Long.compare(o.diff, diff)
-        }
-    }
-
-    static class DependenciesDiffFileModel implements Comparable<DependenciesDiffFileModel> {
-        public static final int CHANGE_NEW = 1;//新文件
-        public static final int CHANGE_HIGH = 2;//增大
-        public static final int CHANGE_EQ = 3;//相等
-        public static final int CHANGE_LOW = 4;//减小
-        public static final int CHANGE_DEL = 5;//删除
-        public int fileChange = 0;
-        public long firstFileSize = 0;
-        public long secondFileSize = 0;
-        public long diffFileSize = 0;
-
-        public static final int TYPE_CLASS = 1;
-        public static final int TYPE_SO = 2;
-        public static final int TYPE_RES = 3;
-        public static final int TYPE_ASSETS = 4;
-        public static final int TYPE_UNKNOW = 5;
-
-        public int fileType = TYPE_UNKNOW;
-
-        public String filePath
-        public String fileShortPath
-
-
-        @Override
-        int compareTo(@NotNull DependenciesDiffFileModel o) {
-            return o.diffFileSize - diffFileSize
-        }
-
-        void handle() {
-            diffFileSize = firstFileSize - secondFileSize
-        }
-
-        static def handleFileType(File file, DependenciesDiffFileModel diffFileModel) {
-            String fileName = file.getName()
-            String filePath = file.getAbsolutePath()
-            if (fileName.contains(".class")) {
-                diffFileModel.fileType = TYPE_CLASS
-            } else if (fileName.contains(".so")) {
-                diffFileModel.fileType = TYPE_SO
-            } else if (filePath.contains("/res/")) {
-                diffFileModel.fileType = TYPE_RES
-            } else if (filePath.contains("/assets/")) {
-                diffFileModel.fileType = TYPE_ASSETS
-            } else {
-                diffFileModel.fileType = TYPE_UNKNOW
-            }
-        }
-
-        static String getType(int type) {
-            if (type == TYPE_CLASS) {
-                return 'class'
-            } else if (type == TYPE_SO) {
-                return 'so'
-            } else if (type == TYPE_RES) {
-                return 'res'
-            } else if (type == TYPE_ASSETS) {
-                return 'assets'
-            } else {
-                return 'unknow'
-            }
-        }
-
-
-        String getChange() {
-            if (fileChange == CHANGE_NEW) {
-                return "新文件"
-            } else if (fileChange == CHANGE_HIGH) {
-                return "增  大"
-            } else if (fileChange == CHANGE_EQ) {
-                return "相  等"
-            } else if (fileChange == CHANGE_LOW) {
-                return "减  小"
-            } else if (fileChange == CHANGE_DEL) {
-                return "删  除"
-            }
-        }
-    }
-
-
-    DependenciesDiffModel handleDiffModel(DependenciesModel firstDependencyModel, DependenciesModel secondDependencyModel) {
-        DependenciesDiffModel diffModel = new DependenciesDiffModel();
+    String createDiffDir(DependenciesModel firstDependencyModel) {
         String moduleShotName = firstDependencyModel.group + ":" + firstDependencyModel.artifact
 
         File moduleRootDir = new File(project.buildDir.getAbsolutePath() + File.separator + BUILD_DIR + File.separator + moduleShotName)
@@ -344,11 +121,52 @@ public class DependenciesDiffTask extends DefaultTask {
             moduleRootDir.deleteDir()
         }
         moduleRootDir.mkdirs()
-        String firstDependencyModulePath = moduleRootDir.getAbsolutePath() + File.separator + firstDependencyModel.module
-        String secondDependencyModulePath = moduleRootDir.getAbsolutePath() + File.separator + secondDependencyModel.module
+        return moduleRootDir.getAbsolutePath()
+    }
 
+    DependenciesDiffModel handleNewCreateModel(DependenciesModel firstDependencyModel) {
+        DependenciesDiffModel newCreateModel = new DependenciesDiffModel()
+
+        //创建文件夹  group:artifact
+        String moduleDir = createDiffDir(firstDependencyModel)
+
+        //解压first
+        String firstDependencyModulePath = moduleDir + File.separator + firstDependencyModel.module
         unzip(firstDependencyModel.path, firstDependencyModulePath)
+
+        List<DependenciesDiffFileModel> diffDependenciesModelList = new ArrayList<>()
+        int firstDependencyPathEndIndex = firstDependencyModulePath.length()
+        for (File firstChildFile : project.fileTree(firstDependencyModulePath)) {
+            DependenciesDiffFileModel newCreateFileDependenciesModel = new DependenciesDiffFileModel();
+            newCreateFileDependenciesModel.firstFileSize = firstChildFile.length()
+            newCreateFileDependenciesModel.fileChange = DependenciesDiffFileModel.CHANGE_NEW
+            newCreateFileDependenciesModel.fileName = firstChildFile.getName()
+            newCreateFileDependenciesModel.filePath = firstChildFile.getAbsolutePath()
+            newCreateFileDependenciesModel.fileShortPath = firstChildFile.getAbsolutePath().substring(firstDependencyPathEndIndex)
+            newCreateFileDependenciesModel.handle()
+            diffDependenciesModelList.add(newCreateFileDependenciesModel)
+        }
+
+        newCreateModel.firstDependenciesModel = firstDependencyModel
+        newCreateModel.dependenciesDiffFileModels = diffDependenciesModelList
+        newCreateModel.status = DependenciesDiffModel.STATUS_NEW
+        newCreateModel.handle()
+        return newCreateModel
+    }
+
+
+    DependenciesDiffModel handleDiffModel(DependenciesModel firstDependencyModel, DependenciesModel secondDependencyModel) {
+        DependenciesDiffModel diffModel = new DependenciesDiffModel();
+        //创建文件夹  group:artifact
+        String moduleDir = createDiffDir(firstDependencyModel)
+
+        //解压first
+        String firstDependencyModulePath = moduleDir + File.separator + firstDependencyModel.module
+        unzip(firstDependencyModel.path, firstDependencyModulePath)
+        //解压second
+        String secondDependencyModulePath = moduleDir + File.separator + secondDependencyModel.module
         unzip(secondDependencyModel.path, secondDependencyModulePath)
+
         // compare
         List<DependenciesDiffFileModel> diffDependenciesModelList = new ArrayList<>();
         int firstDependencyPathEndIndex = firstDependencyModulePath.length()
@@ -375,7 +193,7 @@ public class DependenciesDiffTask extends DefaultTask {
             }
             diffFileDependenciesModel.filePath = firstChildPath
             diffFileDependenciesModel.fileShortPath = firstChildPath.substring(firstDependencyPathEndIndex)
-            diffFileDependenciesModel.handleFileType(firstChildFile, diffFileDependenciesModel)
+            diffFileDependenciesModel.fileName = firstChildFile.getName()
             diffFileDependenciesModel.handle()
             diffDependenciesModelList.add(diffFileDependenciesModel)
         }
@@ -393,7 +211,8 @@ public class DependenciesDiffTask extends DefaultTask {
                 diffFileModel.filePath = secondChildPath
                 diffFileModel.fileShortPath = secondChildPath.substring(secondDependencyPathEndIndex)
                 diffFileModel.fileChange = DependenciesDiffFileModel.CHANGE_DEL
-                DependenciesDiffFileModel.handleFileType(secondChildFile, diffFileModel)
+                diffFileModel.fileName = secondChildFile.getName()
+
                 diffFileModel.handle()
                 diffDependenciesModelList.add(diffFileModel)
             }
@@ -409,36 +228,26 @@ public class DependenciesDiffTask extends DefaultTask {
         return diffModel
     }
 
-    def unzip(String from_path, String into_path) {
+    def unzip(String fromPath, String intoPath) {
         project.copy {
-            from(project.zipTree(from_path))
-            into(into_path)
+            from(project.zipTree(fromPath))
+            into(intoPath)
         }
 
-        File unzip_dir = project.file(into_path)
-        if (unzip_dir.exists() && unzip_dir.isDirectory()) {
-            File[] dir_files = unzip_dir.listFiles()
-            for (File child_file : dir_files) {
-                if (child_file.isFile() && child_file.getName().contains("classes.jar")) {
-                    unzip(child_file.getAbsolutePath(), child_file.getAbsolutePath() + "_dir")
-                    child_file.delete()
+        File unzipDir = project.file(intoPath)
+        if (unzipDir.exists() && unzipDir.isDirectory()) {
+            File[] dirFiles = unzipDir.listFiles()
+            for (File childFile : dirFiles) {
+                if (childFile.isFile() && childFile.getName().contains("classes.jar")) {
+                    unzip(childFile.getAbsolutePath(), childFile.getAbsolutePath() + "_dir")
+                    childFile.delete()
                 }
             }
         }
     }
 
 
-    class DependenciesModel {
-        //module,group,artifact,version,path
-        public String module
-        public String group
-        public String artifact
-        public String version
-        public String path
-        public long size
-    }
-
-    DependenciesModel getSameModel(List<DependenciesModel> dependenciesModels, model) {
+    static DependenciesModel getSameModel(List<DependenciesModel> dependenciesModels, model) {
         for (DependenciesModel m : dependenciesModels) {
             if (m.group == model.group && m.artifact == model.artifact) {
                 return m
@@ -479,6 +288,66 @@ public class DependenciesDiffTask extends DefaultTask {
         }
 
         return models
+    }
+
+    def handleExclude(List<DependenciesDiffModel> dependenciesModelList) {
+        Iterator<DependenciesDiffModel> iterator = dependenciesModelList.iterator()
+
+        while (iterator.hasNext()) {
+            DependenciesDiffModel model = iterator.next()
+            boolean excludeModule = isExcludeModule(model)
+            // 移除module
+            if (excludeModule) {
+                iterator.remove()
+                continue
+            }
+            if (model.dependenciesDiffFileModels != null) {
+                handleChildExclude(model.dependenciesDiffFileModels)
+            }
+        }
+    }
+
+    def handleChildExclude(List<DependenciesDiffFileModel> childModelLists) {
+        Iterator<DependenciesDiffFileModel> childIterable = childModelLists.iterator()
+        while (childIterable.hasNext()) {
+            DependenciesDiffFileModel childModel = childIterable.next()
+            boolean excludeFile = isExcludeModuleFile(childModel)
+            if (excludeFile) {
+                childIterable.remove()
+            }
+        }
+    }
+
+    boolean isExcludeModuleFile(DependenciesDiffFileModel childModel) {
+        if (excludeModuleFile != null) {
+            for (String exclude : excludeModuleFile) {
+                if (childModel.filePath.contains(exclude)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+
+    boolean isExcludeModule(DependenciesDiffModel model) {
+        //过滤module
+        if (excludeModule != null) {
+            for (String exclude : excludeModule) {
+                if (model.module.contains(exclude)) {
+                    return true
+                }
+            }
+        }
+        //过滤module 状态
+        if (excludeModuleStatus != null) {
+            for (int exclude : excludeModuleStatus) {
+                if (model.status == exclude) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
 
